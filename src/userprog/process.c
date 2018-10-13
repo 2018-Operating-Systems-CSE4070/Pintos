@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "lib/stdio.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -30,6 +31,9 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
+  char *save_ptr;
+  char file_name_and_arg[129];
+  char *exec_file_name;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -38,8 +42,11 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+  strlcpy (file_name_and_arg, file_name, 129);
+  exec_file_name = strtok_r (file_name_and_arg, " ", &save_ptr);
+
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
@@ -63,7 +70,7 @@ start_process (void *file_name_)
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success)
     thread_exit ();
 
   /* Start the user process by simulating a return from an
@@ -88,6 +95,7 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
+  while(1){}
   return -1;
 }
 
@@ -213,7 +221,13 @@ load (const char *file_name, void (**eip) (void), void **esp)
   struct file *file = NULL;
   off_t file_ofset;
   bool success = false;
-  int i;
+  int i, j;
+  char *save_ptr;
+  char file_name_and_arg[129];
+  char *exec_file_name;
+  char *argv[30] = {0};
+  int argc = 0;
+  void *esp_copy;
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -221,11 +235,16 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   process_activate ();
 
+  strlcpy (file_name_and_arg, file_name, 129);
+  for (argv[argc] = strtok_r (file_name_and_arg, " ", &save_ptr); argv[argc] != NULL;
+       argv[++argc] = strtok_r (NULL, " ", &save_ptr));
+  exec_file_name = argv[0];
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (exec_file_name);
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s: open failed\n", exec_file_name);
       goto done; 
     }
 
@@ -238,7 +257,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      printf ("load: %s: error loading executable\n", file_name);
+      printf ("load: %s: error loading executable\n", exec_file_name);
       goto done; 
     }
 
@@ -304,6 +323,33 @@ load (const char *file_name, void (**eip) (void), void **esp)
   /* Set up stack. */
   if (!setup_stack (esp))
     goto done;
+  
+  esp_copy = *esp;
+  for(i = strlen(file_name); i >= 0; i--)
+    {
+      *esp -= 1; **(uint8_t **)esp = file_name_and_arg[i];
+    }
+  
+  if((strlen(file_name) + 1) % 4 != 0)
+    {
+      int word_align_len = (strlen(file_name) + 1) % 4;
+      word_align_len = 4 - word_align_len;
+      for(j = 0; j < word_align_len; j++)
+        {
+          *esp -= 1; **(uint8_t **)esp = 0;
+        }
+    }
+  *esp -= 4; **(uint32_t **)esp = 0;
+
+  for(i = argc - 1; i >= 0; i--)
+    {
+      esp_copy -= (strlen(argv[i]) + 1);
+      *esp -= 4; **(uint32_t **)esp = esp_copy;
+    }
+
+  *esp -= 4; **(uint32_t **)esp = *esp + 4;
+  *esp -= 4; **(uint32_t **)esp = argc;
+  *esp -= 4; **(uint32_t **)esp = 0;
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
