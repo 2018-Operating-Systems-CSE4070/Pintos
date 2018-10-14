@@ -116,6 +116,7 @@ process_wait (tid_t child_tid UNUSED)
         thread_status_table[idx].tid = -1;
         break;
       }
+    thread_yield();
     //printf("%d\n", thread_status_table[idx].status);
   }
   return exit_status;
