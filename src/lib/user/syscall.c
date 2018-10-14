@@ -200,3 +200,15 @@ inumber (int fd)
 {
   return syscall1 (SYS_INUMBER, fd);
 }
+
+int
+fibonacci(int n)
+{
+  return syscall1 (SYS_FIBO, n);
+}
+
+int
+sum_of_four_integers(int a, int b, int c, int d)
+{
+  return syscall4 (SYS_SUM, a, b, c, d);
+}

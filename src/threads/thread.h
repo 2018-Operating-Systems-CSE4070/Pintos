@@ -96,11 +96,23 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    int thread_status_table_idx;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
+
+#define TABLE_MAX 1001
+struct thread_status_sync
+  {
+    tid_t tid;
+    tid_t parent_tid;
+    enum thread_status status;
+    int exit_status;
+  } thread_status_table[TABLE_MAX];
+
+extern int thread_status_table_cnt;
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

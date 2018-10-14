@@ -43,6 +43,8 @@ process_execute (const char *file_name)
 
   strlcpy (file_name_and_arg, file_name, 129);
   exec_file_name = strtok_r (file_name_and_arg, " ", &save_ptr);
+  if(filesys_open(exec_file_name) == NULL)
+    return -1;
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -94,8 +96,31 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  while(1){}
-  return -1;
+  int idx;
+  int exit_status = -1;
+  if(child_tid == TID_ERROR) return exit_status;
+  for(idx = 0; idx < thread_status_table_cnt; idx++)
+    {
+      if(thread_status_table[idx].tid == child_tid) break;
+    }
+  if(idx == TABLE_MAX) return exit_status;
+  if(thread_status_table[idx].parent_tid != thread_current()->tid) return exit_status;
+
+  while(1)
+  {
+    for(idx = 0; idx < TABLE_MAX; idx++)
+      {
+        if(thread_status_table[idx].tid == child_tid) break;
+      }
+    if(thread_status_table[idx].status == THREAD_DYING)
+      {
+        exit_status = thread_status_table[idx].exit_status;
+        thread_status_table[idx].tid = -1;
+        break;
+      }
+    //printf("%d\n", thread_status_table[idx].status);
+  }
+  return exit_status;
 }
 
 /* Free the current process's resources. */
@@ -324,9 +349,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
     goto done;
   
   esp_copy = *esp;
-  for(i = strlen(file_name); i >= 0; i--)
+  for(i = argc - 1; i >= 0; i--)
     {
-      *esp -= 1; **(uint8_t **)esp = file_name_and_arg[i];
+      *esp -= (strlen(argv[i]) + 1);
+      strlcpy(*esp, argv[i], strlen(argv[i]) + 1);
     }
   
   if((strlen(file_name) + 1) % 4 != 0)
@@ -343,10 +369,10 @@ load (const char *file_name, void (**eip) (void), void **esp)
   for(i = argc - 1; i >= 0; i--)
     {
       esp_copy -= (strlen(argv[i]) + 1);
-      *esp -= 4; **(uint32_t **)esp = esp_copy;
+      *esp -= 4; **(uint32_t **)esp = (uint32_t)esp_copy;
     }
 
-  *esp -= 4; **(uint32_t **)esp = *esp + 4;
+  *esp -= 4; **(uint32_t **)esp = (uint32_t)*esp + 4;
   *esp -= 4; **(uint32_t **)esp = argc;
   *esp -= 4; **(uint32_t **)esp = 0;
 
