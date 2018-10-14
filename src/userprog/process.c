@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/synch.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -108,10 +109,7 @@ process_wait (tid_t child_tid UNUSED)
 
   while(1)
   {
-    for(idx = 0; idx < TABLE_MAX; idx++)
-      {
-        if(thread_status_table[idx].tid == child_tid) break;
-      }
+    barrier();
     if(thread_status_table[idx].status == THREAD_DYING)
       {
         exit_status = thread_status_table[idx].exit_status;
