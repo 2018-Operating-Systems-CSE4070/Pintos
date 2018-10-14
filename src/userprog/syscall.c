@@ -44,27 +44,36 @@ syscall_handler (struct intr_frame *f UNUSED)
   switch(syscall_num)
   {
     case SYS_HALT:
+    {
       syscall_halt();
       break;
+    }
     case SYS_EXIT:
+    {
       int status;
       if(is_valid_addr(f->esp + 4)) syscall_exit(-1);
       else status = *(int*)(f->esp + 4);
       syscall_exit(status);
       break;
+    }
     case SYS_EXEC:
+    {
       const char *cmd_line;
       if(is_valid_addr(f->esp + 4)) syscall_exit(-1);
-      else cmd_line = *(const char*)(f->esp + 4);
+      else cmd_line = *(const char**)(f->esp + 4);
       f->eax = syscall_exec(cmd_line);
       break;
+    }
     case SYS_WAIT:
+    {
       pid_t pid;
       if(is_valid_addr(f->esp + 4)) syscall_exit(-1);
       else pid = *(pid_t*)(f->esp + 4);
       f->eax = syscall_wait(pid);
       break;
+    }
     case SYS_READ:
+    {
       int fd;
       void *buffer;
       unsigned size;
@@ -76,7 +85,9 @@ syscall_handler (struct intr_frame *f UNUSED)
       else size = *(unsigned*)(f->esp + 12);
       f->eax = syscall_read(fd, buffer, size);
       break;
+    }
     case SYS_WRITE:
+    {
       int fd;
       const void *buffer;
       unsigned size;
@@ -88,34 +99,63 @@ syscall_handler (struct intr_frame *f UNUSED)
       else size = *(unsigned*)(f->esp + 12);
       f->eax = syscall_write(fd, buffer, size);
       break;
+    }
     case SYS_CREATE:
+    {
       break;
+    } 
     case SYS_REMOVE:
+    {
       break;
+    }
     case SYS_OPEN:
+    {
       break;
+    }
     case SYS_FILESIZE:
+    {
       break;
+    }
     case SYS_SEEK:
+    {
       break;
+    }
     case SYS_TELL:
+    {
       break;
+    }
     case SYS_CLOSE:
+    {
       break;
+    }
     case SYS_MMAP:
+    {
       break;
+    }
     case SYS_MUNMAP:
+    {
       break;
+    }
     case SYS_CHDIR:
+    {
       break;
+    }
     case SYS_MKDIR:
+    {
       break;
+    }
     case SYS_READDIR:
+    {
       break;
+    }
     case SYS_ISDIR:
+    {
       break;
+    }
     case SYS_INUMBER:
+    {
       break;
+    }
   }
 }
 
