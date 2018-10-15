@@ -117,7 +117,6 @@ process_wait (tid_t child_tid UNUSED)
         break;
       }
     thread_yield();
-    //printf("%d\n", thread_status_table[idx].status);
   }
   return exit_status;
 }
@@ -249,7 +248,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   char file_name_and_arg[129];
   char *exec_file_name;
   char *argv[30] = {0};
-  int argc = 0;
+  int argc = 0, arg_len = 0;
   void *esp_copy;
 
   /* Allocate and activate page directory. */
@@ -350,14 +349,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
   esp_copy = *esp;
   for(i = argc - 1; i >= 0; i--)
     {
+      arg_len += (strlen(argv[i]) + 1);
       *esp -= (strlen(argv[i]) + 1);
       strlcpy(*esp, argv[i], strlen(argv[i]) + 1);
     }
   
-  if((strlen(file_name) + 1) % 4 != 0)
+  if((arg_len + 1) % 4 != 0)
     {
-      int word_align_len = (strlen(file_name) + 1) % 4;
-      word_align_len = 4 - word_align_len;
+      int word_align_len;
+      word_align_len = 4 - ((arg_len + 1) % 4);
       for(j = 0; j < word_align_len; j++)
         {
           *esp -= 1; **(uint8_t **)esp = 0;

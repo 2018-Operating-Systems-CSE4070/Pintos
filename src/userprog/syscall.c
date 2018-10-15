@@ -242,7 +242,7 @@ syscall_write (int fd, const void *buffer, unsigned size)
 }
 
 int
-syscall_fibonacci(int n)
+syscall_fibonacci (int n)
 {
   int i;
   int x0 = 2, x1 = 1, x2 = 1;
@@ -257,7 +257,7 @@ syscall_fibonacci(int n)
   return x0;
 }
 int
-syscall_sum_of_four_integers(int a, int b, int c, int d)
+syscall_sum_of_four_integers (int a, int b, int c, int d)
 {
   return a + b + c + d;
 }
