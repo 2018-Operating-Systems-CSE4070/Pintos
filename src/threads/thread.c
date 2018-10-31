@@ -54,8 +54,6 @@ static long long user_ticks;    /* # of timer ticks in user programs. */
 #define TIME_SLICE 4            /* # of timer ticks to give each thread. */
 static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 
-int thread_status_table_cnt = 0;
-
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
@@ -186,13 +184,6 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
 
-  int new_idx = thread_status_table_cnt++;
-  thread_status_table[new_idx].tid = tid;
-  thread_status_table[new_idx].parent_tid = running_thread()->tid;
-  thread_status_table[new_idx].status = THREAD_RUNNING;
-  thread_status_table[new_idx].exit_status = -1;
-  t->thread_status_table_idx = new_idx;
-
   /* Prepare thread for first run by initializing its stack.
      Do this atomically so intermediate values for the 'stack' 
      member cannot be observed. */
@@ -309,9 +300,6 @@ thread_exit (void)
   intr_disable ();
   list_remove (&thread_current()->allelem);
   thread_current ()->status = THREAD_DYING;
-
-  int idx = running_thread()->thread_status_table_idx;
-  thread_status_table[idx].status = THREAD_DYING;
 
   schedule ();
   NOT_REACHED ();
@@ -483,6 +471,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
+
+  t->exit_status = -1;
+  t->parent_thread = running_thread();
+  sema_init(&t->sema_wait, 0);
+  sema_init(&t->sema_exit, 0);
+  list_init(&t->child_list);
+  list_push_back(&running_thread()->child_list, &t->child_elem);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

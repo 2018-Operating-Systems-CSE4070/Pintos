@@ -202,7 +202,7 @@ void
 syscall_exit (int status)
 {
   printf("%s: exit(%d)\n", thread_current()->name, status);
-  thread_status_table[thread_current()->thread_status_table_idx].exit_status = status;
+  thread_current()->exit_status = status;
   thread_exit();
 }
 pid_t

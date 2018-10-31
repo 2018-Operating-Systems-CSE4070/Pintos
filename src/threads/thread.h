@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -96,23 +97,17 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    int thread_status_table_idx;
+    struct thread* parent_thread;
+    struct semaphore sema_wait;
+    struct semaphore sema_exit;
+    struct list child_list;
+    struct list_elem child_elem;
+    int exit_status;
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };
-
-#define TABLE_MAX 1001
-struct thread_status_sync
-  {
-    tid_t tid;
-    tid_t parent_tid;
-    enum thread_status status;
-    int exit_status;
-  } thread_status_table[TABLE_MAX];
-
-extern int thread_status_table_cnt;
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.

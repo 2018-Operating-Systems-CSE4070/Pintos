@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/synch.h"
+#include <list.h>
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -99,24 +100,23 @@ process_wait (tid_t child_tid UNUSED)
 {
   int idx;
   int exit_status = -1;
-  if(child_tid == TID_ERROR) return exit_status;
-  for(idx = 0; idx < thread_status_table_cnt; idx++)
-    {
-      if(thread_status_table[idx].tid == child_tid) break;
-    }
-  if(idx == TABLE_MAX) return exit_status;
-  if(thread_status_table[idx].parent_tid != thread_current()->tid) return exit_status;
+  struct thread *child_thread;
+  struct list_elem *e;
+  struct list *l = &thread_current()->child_list;
 
-  while(1)
+  if(child_tid == TID_ERROR) return exit_status;
+
+  for (e = list_begin(l); e != list_end(l); e = list_next(e))
   {
-    barrier();
-    if(thread_status_table[idx].status == THREAD_DYING)
-      {
-        exit_status = thread_status_table[idx].exit_status;
-        thread_status_table[idx].tid = -1;
-        break;
-      }
-    thread_yield();
+    child_thread = list_entry(e, struct thread, child_elem);
+    if(child_thread->tid == child_tid && child_thread->parent_thread == thread_current())
+    {
+      sema_down(&thread_current()->sema_wait);
+      exit_status = child_thread->exit_status;
+      list_remove (&child_thread->child_elem);
+      sema_up(&child_thread->sema_exit);
+      break;
+    }
   }
   return exit_status;
 }
@@ -144,6 +144,9 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  
+  sema_up(&cur->parent_thread->sema_wait);
+  sema_down(&cur->sema_exit);
 }
 
 /* Sets up the CPU for running user code in the current
