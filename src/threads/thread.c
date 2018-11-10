@@ -478,6 +478,8 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_exit, 0);
   list_init(&t->child_list);
   list_push_back(&running_thread()->child_list, &t->child_elem);
+
+  t->file_table_size = 2;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

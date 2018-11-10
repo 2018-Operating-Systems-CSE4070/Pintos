@@ -3,6 +3,7 @@
 #include "filesys/inode.h"
 #include "threads/malloc.h"
 
+struct lock lock_file;
 /* An open file. */
 struct file 
   {
@@ -165,4 +166,16 @@ file_tell (struct file *file)
 {
   ASSERT (file != NULL);
   return file->pos;
+}
+
+bool
+is_executable_file(const char *file)
+{
+  if(strcmp(thread_current()->name, file) == 0) return true;
+  else return false;
+}
+bool
+get_deny_write(struct file *file)
+{
+  return file->deny_write;
 }

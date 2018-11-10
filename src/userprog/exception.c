@@ -127,6 +127,7 @@ page_fault (struct intr_frame *f)
   bool not_present;  /* True: not-present page, false: writing r/o page. */
   bool write;        /* True: access was write, false: access was read. */
   bool user;         /* True: access by user, false: access by kernel. */
+  bool read;
   void *fault_addr;  /* Fault address. */
 
   /* Obtain faulting address, the virtual address that was
@@ -149,7 +150,8 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-  if(!user || is_kernel_vaddr(fault_addr))
+  read = (f->error_code & PF_W) != 1;
+  if(read || write || !user || is_kernel_vaddr(fault_addr))
     {
       syscall_exit(-1);
     }

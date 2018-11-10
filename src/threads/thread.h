@@ -103,6 +103,9 @@ struct thread
     struct list child_list;
     struct list_elem child_elem;
     int exit_status;
+    
+    struct file *file_table[130];
+    int file_table_size;
 #endif
 
     /* Owned by thread.c. */

@@ -45,13 +45,19 @@ process_execute (const char *file_name)
 
   strlcpy (file_name_and_arg, file_name, 129);
   exec_file_name = strtok_r (file_name_and_arg, " ", &save_ptr);
+
+  lock_acquire(&lock_file);
   if(filesys_open(exec_file_name) == NULL)
+  {
+    lock_release(&lock_file);
     return -1;
+  }
+  lock_release(&lock_file);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);
   return tid;
 }
 
@@ -69,7 +75,10 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+
+  lock_acquire(&lock_file);
   success = load (file_name, &if_.eip, &if_.esp);
+  lock_release(&lock_file);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
@@ -267,6 +276,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (exec_file_name);
+
   if (file == NULL) 
     {
       printf ("load: %s: open failed\n", exec_file_name);

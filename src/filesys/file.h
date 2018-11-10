@@ -2,7 +2,11 @@
 #define FILESYS_FILE_H
 
 #include "filesys/off_t.h"
+#include "threads/synch.h"
+#include "threads/thread.h"
+#include <string.h>
 
+extern struct lock lock_file;
 struct inode;
 
 /* Opening and closing files. */
@@ -25,5 +29,8 @@ void file_allow_write (struct file *);
 void file_seek (struct file *, off_t);
 off_t file_tell (struct file *);
 off_t file_length (struct file *);
+
+bool is_executable_file(const char *file);
+bool get_deny_write(struct file *file);
 
 #endif /* filesys/file.h */

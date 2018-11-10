@@ -9,6 +9,8 @@
 #include <console.h>
 #include "userprog/process.h"
 #include "devices/input.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
 
 typedef int pid_t;
 static void syscall_handler (struct intr_frame *);
@@ -128,30 +130,64 @@ syscall_handler (struct intr_frame *f UNUSED)
     }
     case SYS_CREATE:
     {
+      const char *file;
+      unsigned initial_size;
+      if(!is_valid_addr(f->esp + 4)) syscall_exit(-1);
+      else file = *(const char**)(f->esp + 4);
+      if(!is_valid_addr(f->esp + 8)) syscall_exit(-1);
+      else initial_size = *(unsigned*)(f->esp + 8);
+      f->eax = syscall_create(file, initial_size);
       break;
     } 
     case SYS_REMOVE:
     {
+      const char *file;
+      if(!is_valid_addr(f->esp + 4)) syscall_exit(-1);
+      else file = *(const char **)(f->esp + 4);
+      f->eax = syscall_remove(file);
       break;
     }
     case SYS_OPEN:
     {
+      const char *file;
+      if(!is_valid_addr(f->esp + 4)) syscall_exit(-1);
+      else file = *(const char **)(f->esp + 4);
+      f->eax = syscall_open(file);
       break;
     }
     case SYS_FILESIZE:
     {
+      int fd;
+      if(!is_valid_addr(f->esp + 4)) syscall_exit(-1);
+      else fd = *(int *)(f->esp + 4);
+      f->eax = syscall_filesize(fd);
       break;
     }
     case SYS_SEEK:
     {
+      int fd;
+      unsigned position;
+      if(!is_valid_addr(f->esp + 4)) syscall_exit(-1);
+      else fd = *(int *)(f->esp + 4);
+      if(!is_valid_addr(f->esp + 8)) syscall_exit(-1);
+      else position = *(unsigned*)(f->esp + 8);
+      syscall_seek(fd, position);
       break;
     }
     case SYS_TELL:
     {
+      int fd;
+      if(!is_valid_addr(f->esp + 4)) syscall_exit(-1);
+      else fd = *(int *)(f->esp + 4);
+      f->eax = syscall_filesize(fd);
       break;
     }
     case SYS_CLOSE:
     {
+      int fd;
+      if(!is_valid_addr(f->esp + 4)) syscall_exit(-1);
+      else fd = *(int *)(f->esp + 4);
+      syscall_close(fd);
       break;
     }
     case SYS_MMAP:
@@ -218,27 +254,55 @@ syscall_wait (pid_t pid)
 int
 syscall_read (int fd, void *buffer, unsigned size)
 {
+  if(!(0 <= fd && fd < 130)) syscall_exit(-1);
+  if(!is_valid_addr(buffer)) syscall_exit(-1);
+  lock_acquire(&lock_file);
   unsigned int i;
   if(fd == 0)
+  {
+    for(i = 0; i < size; i++)
     {
-      for(i = 0; i < size; i++)
-        {
-          ((uint8_t*)buffer)[i] = input_getc();
-          if(((uint8_t*)buffer)[i] == 0) return i;
-        }
-      return i;
+      ((uint8_t*)buffer)[i] = input_getc();
+      if(((uint8_t*)buffer)[i] == 0) return i;
     }
-  else return -1;
+    lock_release(&lock_file);
+    return i;
+  }
+  else
+  {
+    struct file *f = thread_current()->file_table[fd];
+    int readed_byte = file_read(f, buffer, size);
+    lock_release(&lock_file);
+    return readed_byte;
+  }
+  
 }
 int
 syscall_write (int fd, const void *buffer, unsigned size)
 {
+  if(!(0 <= fd && fd < 130)) syscall_exit(-1);
+  if(!is_valid_addr(buffer)) syscall_exit(-1);
+  lock_acquire(&lock_file);
   if(fd == 1)
+  {
+    putbuf(buffer, size);
+    lock_release(&lock_file);
+    return size;
+  }
+  else
+  {
+    struct file *f = thread_current()->file_table[fd];
+
+    if(get_deny_write(f))
     {
-      putbuf(buffer, size);
-      return size;
+      lock_release(&lock_file);
+      return 0;
     }
-  else return -1;
+
+    int byte_written = file_write(f, buffer, size);
+    lock_release(&lock_file);
+    return byte_written;
+  }
 }
 
 int
@@ -260,4 +324,106 @@ int
 syscall_sum_of_four_integers (int a, int b, int c, int d)
 {
   return a + b + c + d;
+}
+
+bool 
+syscall_create (const char *file, unsigned initial_size)
+{
+  if(file == NULL) syscall_exit(-1);
+  if(!is_valid_addr(file)) syscall_exit(-1);
+  lock_acquire(&lock_file);
+  bool success = filesys_create(file, initial_size);
+  lock_release(&lock_file);
+  return success;
+}
+bool 
+syscall_remove (const char *file)
+{
+  if(file == NULL) syscall_exit(-1);
+  if(!is_valid_addr(file)) syscall_exit(-1);
+  //if(is_executable_file(file)) return false;
+  lock_acquire(&lock_file);
+  bool success = filesys_remove(file);
+  lock_release(&lock_file);
+  return success;
+}
+int 
+syscall_open (const char *file)
+{
+  if(file == NULL) syscall_exit(-1);
+  if(!is_valid_addr(file)) syscall_exit(-1);
+  lock_acquire(&lock_file);
+  struct file *f = filesys_open(file);
+  if(f == NULL)
+  {
+    lock_release(&lock_file);
+    return -1;
+  }
+  struct thread *t = thread_current();
+  int fd = t->file_table_size;
+  t->file_table[fd] = f;
+  t->file_table_size++;
+  
+  if(is_executable_file(file)) file_deny_write(f);
+  
+  lock_release(&lock_file);
+  return fd;
+}
+int 
+syscall_filesize (int fd)
+{
+  if(!(0 <= fd && fd < 130)) syscall_exit(-1);
+  lock_acquire(&lock_file);
+  struct file *f = thread_current()->file_table[fd];
+  if(f == NULL)
+  {
+    lock_release(&lock_file);
+    syscall_exit(-1);
+  }
+  off_t length = file_length(f);
+  lock_release(&lock_file);
+  return length;
+}
+void 
+syscall_seek (int fd, unsigned position)
+{
+  if(!(0 <= fd && fd < 130)) syscall_exit(-1);
+  lock_acquire(&lock_file);
+  struct file *f = thread_current()->file_table[fd];
+  if(f == NULL)
+  {
+    lock_release(&lock_file);
+    syscall_exit(-1);
+  }
+  file_seek(f, position);
+  lock_release(&lock_file);
+}
+unsigned
+syscall_tell (int fd)
+{
+  if(!(0 <= fd && fd < 130)) syscall_exit(-1);
+  lock_acquire(&lock_file);
+  struct file *f = thread_current()->file_table[fd];
+  if(f == NULL)
+  {
+    lock_release(&lock_file);
+    syscall_exit(-1);
+  }
+  file_tell(f);
+  lock_release(&lock_file);
+}
+void 
+syscall_close (int fd)
+{
+  if(!(0 <= fd && fd < 130)) syscall_exit(-1);
+  lock_acquire(&lock_file);
+  struct file *f = thread_current()->file_table[fd];
+  if(f == NULL)
+  {
+    lock_release(&lock_file);
+    syscall_exit(-1);
+  }
+  file_close(f);
+  thread_current()->file_table[fd] = NULL;
+  lock_release(&lock_file);
 }
