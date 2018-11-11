@@ -275,7 +275,6 @@ syscall_read (int fd, void *buffer, unsigned size)
     lock_release(&lock_file);
     return readed_byte;
   }
-  
 }
 int
 syscall_write (int fd, const void *buffer, unsigned size)
