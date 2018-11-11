@@ -56,6 +56,21 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (exec_file_name, PRI_DEFAULT, start_process, fn_copy);
+
+  struct thread *child_thread;
+  struct list_elem *e;
+  struct list *l = &thread_current()->child_list;
+  for (e = list_begin(l); e != list_end(l); e = list_next(e))
+  {
+    child_thread = list_entry(e, struct thread, child_elem);
+    if(child_thread->tid == tid && child_thread->parent_thread == thread_current())
+    {
+      sema_down(&child_thread->sema_load);
+      if(!child_thread->load_status) return TID_ERROR;
+      break;
+    }
+  }
+
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy);
   return tid;
@@ -78,6 +93,8 @@ start_process (void *file_name_)
 
   lock_acquire(&lock_file);
   success = load (file_name, &if_.eip, &if_.esp);
+  thread_current()->load_status = success;
+  sema_up(&thread_current()->sema_load);
   lock_release(&lock_file);
 
   /* If load failed, quit. */
@@ -107,7 +124,6 @@ start_process (void *file_name_)
 int
 process_wait (tid_t child_tid UNUSED) 
 {
-  int idx;
   int exit_status = -1;
   struct thread *child_thread;
   struct list_elem *e;

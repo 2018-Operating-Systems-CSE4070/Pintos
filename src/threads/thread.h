@@ -106,6 +106,8 @@ struct thread
     
     struct file *file_table[130];
     int file_table_size;
+    struct semaphore sema_load;
+    bool load_status;
 #endif
 
     /* Owned by thread.c. */

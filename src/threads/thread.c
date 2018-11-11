@@ -482,6 +482,8 @@ init_thread (struct thread *t, const char *name, int priority)
 
   for(i = 0; i < 130; i++) t->file_table[i] = NULL;
   t->file_table_size = 2;
+  sema_init(&t->sema_load, 0);
+  t->load_status = false;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
