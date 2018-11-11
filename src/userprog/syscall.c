@@ -263,7 +263,7 @@ syscall_read (int fd, void *buffer, unsigned size)
     for(i = 0; i < size; i++)
     {
       ((uint8_t*)buffer)[i] = input_getc();
-      if(((uint8_t*)buffer)[i] == 0) return i;
+      if(((uint8_t*)buffer)[i] == 0) break;
     }
     lock_release(&lock_file);
     return i;
