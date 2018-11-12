@@ -16,7 +16,7 @@ Sogang Univ. CSE4070
 2. User Memory Access
 3. System Call Infrastructure
 4. System Call Implementation
-5. Addirional Implementation
+5. Additional Implementation
 ```
 
 ## Proj2. User Program-2

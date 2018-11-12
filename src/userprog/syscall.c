@@ -271,6 +271,11 @@ syscall_read (int fd, void *buffer, unsigned size)
   else
   {
     struct file *f = thread_current()->file_table[fd];
+    if(f == NULL)
+    {
+      lock_release(&lock_file);
+      syscall_exit(-1);
+    }
     int readed_byte = file_read(f, buffer, size);
     lock_release(&lock_file);
     return readed_byte;
@@ -291,13 +296,16 @@ syscall_write (int fd, const void *buffer, unsigned size)
   else
   {
     struct file *f = thread_current()->file_table[fd];
-
+    if(f == NULL)
+    {
+      lock_release(&lock_file);
+      syscall_exit(-1);
+    }
     if(get_deny_write(f))
     {
       lock_release(&lock_file);
       return 0;
     }
-
     int byte_written = file_write(f, buffer, size);
     lock_release(&lock_file);
     return byte_written;
