@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <round.h>
 #include <stdio.h>
+#include <list.h>
 #include "devices/pit.h"
 #include "threads/interrupt.h"
 #include "threads/synch.h"
@@ -16,6 +17,9 @@
 #if TIMER_FREQ > 1000
 #error TIMER_FREQ <= 1000 recommended
 #endif
+
+static struct list sleep_list;
+bool sleep_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
@@ -37,6 +41,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init(&sleep_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -89,11 +94,18 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
-
+  enum intr_level old_level;
+  thread_current()->wakeup_time = timer_ticks () + ticks;
+  
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+
+  old_level = intr_disable ();
+  if (thread_current()->wakeup_time > timer_ticks()) 
+  {
+    list_insert_ordered(&sleep_list, &thread_current()->sleep_elem, sleep_list_less_func, NULL);
+    thread_block ();
+  }
+  intr_set_level (old_level);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +184,16 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+
+  struct thread *t;
+  struct list_elem *e;
+  for (e = list_begin(&sleep_list); e != list_end(&sleep_list); e = list_next(e))
+  {
+    t = list_entry(e, struct thread, sleep_elem);
+    if(t->wakeup_time > timer_ticks()) break;
+    list_pop_front(&sleep_list);
+    thread_unblock(t);
+  }
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -243,4 +265,12 @@ real_time_delay (int64_t num, int32_t denom)
      the possibility of overflow. */
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
+}
+
+bool sleep_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+  struct thread* at = list_entry(a, struct thread, sleep_elem);
+  struct thread* bt = list_entry(b, struct thread, sleep_elem);
+  if(at->wakeup_time < bt->wakeup_time) return 1;
+  else return 0;
 }

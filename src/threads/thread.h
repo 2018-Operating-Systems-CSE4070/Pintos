@@ -98,9 +98,6 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-#ifdef USERPROG
-    /* Owned by userprog/process.c. */
-    uint32_t *pagedir;                  /* Page directory. */
     struct thread* parent_thread;
     struct semaphore sema_wait;
     struct semaphore sema_exit;
@@ -112,6 +109,13 @@ struct thread
     int file_table_size;
     struct semaphore sema_load;
     bool load_status;
+
+    int64_t wakeup_time;
+    struct list_elem sleep_elem;
+
+#ifdef USERPROG
+    /* Owned by userprog/process.c. */
+    uint32_t *pagedir;                  /* Page directory. */
 #endif
 
     /* Owned by thread.c. */
