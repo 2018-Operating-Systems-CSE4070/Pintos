@@ -191,7 +191,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
   {
     t = list_entry(e, struct thread, sleep_elem);
     if(t->wakeup_time > timer_ticks()) break;
-    list_pop_front(&sleep_list);
+    list_remove(&t->sleep_elem);
     thread_unblock(t);
   }
 }
