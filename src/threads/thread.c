@@ -165,11 +165,11 @@ thread_tick (void)
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
   
-// #ifndef USERPROG
-//   /* Project #3. */
-//   if (thread_prior_aging == true)
-//     thread_aging ();
-// #endif
+#ifndef USERPROG
+  /* Project #3. */
+  if (thread_prior_aging == true)
+    thread_aging ();
+#endif
 }
 
 /* Prints thread statistics. */
@@ -242,8 +242,8 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  //if(thread_current()->priority < priority)
-    //thread_yield();
+  if(thread_current()->priority < priority)
+    thread_yield();
 
   return tid;
 }
@@ -381,6 +381,7 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -543,10 +544,30 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
-    return idle_thread;
+  if(!thread_mlfqs)
+  {
+    if (list_empty (&ready_list))
+      return idle_thread;
+    else
+    {
+      struct thread *t, *t_max = NULL;
+      struct list_elem *e;
+      int priority_max = -1;
+      for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
+      {
+        t = list_entry(e, struct thread, elem);
+        if(t->status != THREAD_READY) continue;
+        if(t->priority > priority_max) priority_max = t->priority, t_max = t;
+      }
+      if(t_max == NULL) return idle_thread;
+      list_remove(&t_max->elem);
+      return t_max;
+    }
+  }
   else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  {
+    return NULL;
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -635,3 +656,14 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void thread_aging ()
+{
+  struct thread *t;
+  struct list_elem *e;
+  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
+  {
+    t = list_entry(e, struct thread, allelem);
+    if(t->status == THREAD_READY) (t->priority)++;
+  }
+}
