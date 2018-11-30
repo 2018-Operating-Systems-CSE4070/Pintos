@@ -24,7 +24,6 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-static struct list mlfq[64];
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -122,7 +121,6 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
-  for(i = 0; i < 64; i++) list_init(&mlfq[i]);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -209,7 +207,6 @@ thread_tick (void)
         if(t2 != idle_thread && (t2->status == THREAD_READY || t2->status == THREAD_RUNNING))
           ready_threads++;
       }
-      printf("\n\n%d\n\n", ready_threads);
       c59 = int2fixed(59);
       r1 = fixed_mul_int(load_avg, 59);
       r1 = fixed_div_int(r1, 60);
@@ -219,7 +216,6 @@ thread_tick (void)
     }
     if (++thread_ticks >= TIME_SLICE)
     {
-      for(i = 0; i < 64; i++) list_init(&mlfq[i]);
       struct thread *t2;
       struct list_elem *e;
 
@@ -235,9 +231,6 @@ thread_tick (void)
 
         if(t2->priority > PRI_MAX) t2->priority = PRI_MAX;
         if(t2->priority < PRI_MIN) t2->priority = PRI_MIN;
-
-        if(t2 == initial_thread || t2 == idle_thread) continue;
-        list_push_back(&mlfq[t2->priority], &t2->elem);
       }
       intr_yield_on_return ();
     }
@@ -356,8 +349,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  if(!thread_mlfqs) list_push_back (&ready_list, &t->elem);
-  else list_push_back (&mlfq[t->priority], &t->elem);
+  list_push_back (&ready_list, &t->elem);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -429,10 +421,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread)
-  {
-    if(!thread_mlfqs) list_push_back (&ready_list, &cur->elem);
-    else list_push_back (&mlfq[cur->priority], &cur->elem);
-  } 
+    list_push_back (&ready_list, &cur->elem);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -636,45 +625,22 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if(!thread_mlfqs)
-  {
-    if (list_empty (&ready_list))
-      return idle_thread;
-    else
-    {
-      struct thread *t, *t_max = NULL;
-      struct list_elem *e;
-      int priority_max = -1;
-      for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
-      {
-        t = list_entry(e, struct thread, elem);
-        if(t->status != THREAD_READY) continue;
-        if(t->priority > priority_max) priority_max = t->priority, t_max = t;
-      }
-      if(t_max == NULL) return idle_thread;
-      list_remove(&t_max->elem);
-      return t_max;
-    }
-  }
+  if (list_empty (&ready_list))
+    return idle_thread;
   else
   {
-    int i;
-    for(i = 63; i >= 0; i--)
+    struct thread *t, *t_max = NULL;
+    struct list_elem *e;
+    int priority_max = -1;
+    for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
     {
-      if (list_empty (&mlfq[i])) continue;
-      struct thread *t;
-      struct list_elem *e;
-      for (e = list_begin(&mlfq[i]); e != list_end(&mlfq[i]); e = list_next(e))
-      {
-        t = list_entry(e, struct thread, elem);
-        if(t->status == THREAD_READY)
-        {
-          list_remove(&t->elem);
-          return t;
-        }
-      }
+      t = list_entry(e, struct thread, elem);
+      if(t->status != THREAD_READY) continue;
+      if(t->priority > priority_max) priority_max = t->priority, t_max = t;
     }
-    return idle_thread;
+    if(t_max == NULL) return idle_thread;
+    list_remove(&t_max->elem);
+    return t_max;
   }
 }
 
