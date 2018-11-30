@@ -35,4 +35,19 @@ Sogang Univ. CSE4070
 ```
 
 ## Proj3. Thread
+
+#### Project period
+
+*18/11/15 ~ 18/12/05*
+
+#### Requirement
+
+```
+1. Change Alarm Clock Method : Busy waiting -> thread_block()
+2. Priority Scheduling : Basic
+3. Fixed-Point Real Arithmetic (17.14 fixed-point number)
+4. Priority Scheduling : BSD (single queue ver.)
+5. Priority Scheduling : Aging
+```
+
 ## Proj4. Virtual Memory
