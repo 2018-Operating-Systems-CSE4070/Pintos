@@ -448,6 +448,8 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  if(thread_mlfqs) return;
+
   int old_priority = thread_current ()->priority;
   thread_current ()->priority = new_priority;
   if(new_priority < old_priority)
@@ -587,7 +589,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  if(!thread_mlfqs) t->priority = priority;
+  else t->priority = PRI_DEFAULT;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 
