@@ -205,20 +205,17 @@ thread_tick (void)
         la2 = fixed_div(la2, fixed_add(la2, c1));
         r = fixed_add_int(fixed_mul(la2, r), nice);
         t2->recent_cpu = r;
-        //t2->recent_cpu = fixed_add_int(fixed_mul(fixed_div(fixed_mul_int(load_avg, 2), fixed_add_int(fixed_mul_int(load_avg, 2), 1)), t->recent_cpu), t->nice);
 
-        if(t2 != idle_thread &&
-        (t2->status == THREAD_READY || t2->status == THREAD_RUNNING))
+        if(t2 != idle_thread && (t2->status == THREAD_READY || t2->status == THREAD_RUNNING))
           ready_threads++;
       }
-      //printf("\n\n%d\n\n", ready_threads);
+      printf("\n\n%d\n\n", ready_threads);
       c59 = int2fixed(59);
       r1 = fixed_mul_int(load_avg, 59);
       r1 = fixed_div_int(r1, 60);
       rd = int2fixed(ready_threads);
       r2 = fixed_div_int(rd, 60);
       load_avg = fixed_add(r1, r2);
-      //load_avg = fixed_div_int(fixed_add_int(fixed_mul_int(load_avg, 59), ready_threads), 60);
     }
     if (++thread_ticks >= TIME_SLICE)
     {
@@ -229,18 +226,17 @@ thread_tick (void)
       for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
       {
         t2 = list_entry(e, struct thread, allelem);
-        if(t2 == initial_thread) continue;
 
         fixed32_t pri, pri_max, r;
         pri_max = int2fixed(PRI_MAX);
         r = fixed_div_int(t2->recent_cpu, 4);
         pri = fixed_sub(pri_max, r);
         t2->priority = fixed2int(pri) - (t2->nice * 2);
-        //t2->priority = PRI_MAX - fixed2int(fixed_div_int(t->recent_cpu, 4)) - (t->nice * 2);
 
         if(t2->priority > PRI_MAX) t2->priority = PRI_MAX;
         if(t2->priority < PRI_MIN) t2->priority = PRI_MIN;
 
+        if(t2 == initial_thread || t2 == idle_thread) continue;
         list_push_back(&mlfq[t2->priority], &t2->elem);
       }
       intr_yield_on_return ();
@@ -463,8 +459,10 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+  int old_priority = thread_current ()->priority;
   thread_current ()->priority = new_priority;
-  thread_yield();
+  if(new_priority < old_priority)
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -478,7 +476,21 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice UNUSED) 
 {
-  thread_current()->nice = nice;
+  struct thread *t = thread_current();
+  int old_priority = t->priority;
+  fixed32_t pri, pri_max, r;
+  
+  t->nice = nice;
+  pri_max = int2fixed(PRI_MAX);
+  r = fixed_div_int(t->recent_cpu, 4);
+  pri = fixed_sub(pri_max, r);
+  t->priority = fixed2int(pri) - (t->nice * 2);
+
+  if(t->priority > PRI_MAX) t->priority = PRI_MAX;
+  if(t->priority < PRI_MIN) t->priority = PRI_MIN;
+
+  if(t->priority < old_priority)
+    thread_yield();
 }
 
 /* Returns the current thread's nice value. */
@@ -753,7 +765,7 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-void thread_aging ()
+void thread_aging (void)
 {
   struct thread *t;
   struct list_elem *e;
