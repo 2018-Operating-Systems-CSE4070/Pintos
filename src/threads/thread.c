@@ -738,9 +738,9 @@ void thread_aging (void)
 {
   struct thread *t;
   struct list_elem *e;
-  for (e = list_begin(&all_list); e != list_end(&all_list); e = list_next(e))
+  for (e = list_begin(&ready_list); e != list_end(&ready_list); e = list_next(e))
   {
-    t = list_entry(e, struct thread, allelem);
-    if(t->status == THREAD_READY) (t->priority)++;
+    t = list_entry(e, struct thread, elem);
+    (t->priority)++;
   }
 }
