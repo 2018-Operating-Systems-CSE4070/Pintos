@@ -51,3 +51,13 @@ Sogang Univ. CSE4070
 ```
 
 ## Proj4. Virtual Memory
+
+*18/12/06 ~ 18/12/26*
+
+#### Requirement
+
+```
+1. Page Table Management : lazy loading (fail)
+2. Paging to and from disk : second chance algorithm (fail)
+3. Stack Growth
+```
