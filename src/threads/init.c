@@ -28,6 +28,9 @@
 #include "userprog/gdt.h"
 #include "userprog/syscall.h"
 #include "userprog/tss.h"
+#include "vm/frame.h"
+#include "vm/page.h"
+#include "vm/swap.h"
 #else
 #include "tests/threads/tests.h"
 #endif
@@ -125,6 +128,12 @@ main (void)
   ide_init ();
   locate_block_devices ();
   filesys_init (format_filesys);
+#endif
+
+#ifdef VM
+  frame_list_init();
+  locate_block_devices ();
+  swap_bitmap_init();
 #endif
 
   printf ("Boot complete.\n");

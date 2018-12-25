@@ -12,6 +12,7 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include "threads/palloc.h"
+#include "vm/frame.h"
 
 static uint32_t *esp;
 
@@ -272,7 +273,7 @@ syscall_read (int fd, void *buffer, unsigned size)
       if(buffer_iter >= (esp - 32) &&
         (PHYS_BASE - pg_round_down(buffer)) <= MAX_STACK_SIZE)
       {
-        void *npage = palloc_get_page(PAL_USER | PAL_ZERO);
+        void *npage = alloc_frame(PAL_USER | PAL_ZERO);
         if(npage == NULL)
         {
             syscall_exit(-1);
@@ -281,7 +282,7 @@ syscall_read (int fd, void *buffer, unsigned size)
         {
             if(!pagedir_set_page(thread_current()->pagedir, pg_round_down(buffer_iter), npage, true))
             {
-              palloc_free_page(npage);
+              free_frame(npage);
             }
         }
       }
