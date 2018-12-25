@@ -11,6 +11,9 @@
 #include "devices/input.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/palloc.h"
+
+static uint32_t *esp;
 
 typedef int pid_t;
 static void syscall_handler (struct intr_frame *);
@@ -43,6 +46,8 @@ static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
   int syscall_num;
+
+  esp = f->esp;
 
   if(!is_valid_addr(f->esp)) syscall_exit(-1);
   else syscall_num = *(int*)f->esp;
@@ -226,7 +231,7 @@ is_valid_addr (const uint8_t *uaddr)
 {
   if(uaddr == NULL) return 0;
   if(is_kernel_vaddr(uaddr)) return 0;
-  if(pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) return 0;
+  //if(pagedir_get_page(thread_current()->pagedir, uaddr) == NULL) return 0;
   return 1;
 }
 void
@@ -256,6 +261,45 @@ syscall_read (int fd, void *buffer, unsigned size)
 {
   if(!(0 <= fd && fd < 130)) syscall_exit(-1);
   if(!is_valid_addr(buffer)) syscall_exit(-1);
+
+  void* buffer_iter = buffer;
+  unsigned size_iter = size;
+
+  while(buffer_iter != NULL)
+  {
+    if(pagedir_get_page(thread_current()->pagedir, buffer_iter) == NULL)
+    {
+      if(buffer_iter >= (esp - 32) &&
+        (PHYS_BASE - pg_round_down(buffer)) <= 8*(1<<20))
+      {
+        void *npage = palloc_get_page(PAL_USER | PAL_ZERO);
+        if(npage == NULL)
+        {
+            syscall_exit(-1);
+        }
+        else
+        {
+            if(!pagedir_set_page(thread_current()->pagedir, pg_round_down(buffer_iter), npage, true))
+            {
+              palloc_free_page(npage);
+            }
+        }
+      }
+      else syscall_exit(-1);
+    }
+
+    if(size_iter == 0) buffer_iter = NULL;
+    else if(size_iter > PGSIZE)
+    {
+      buffer_iter += PGSIZE;
+      size_iter -= PGSIZE;
+    }
+    else
+    {
+      buffer_iter = buffer + size - 1;
+      size_iter = 0;
+    }
+  }
   lock_acquire(&lock_file);
   unsigned int i;
   if(fd == 0)

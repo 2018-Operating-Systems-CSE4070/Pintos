@@ -6,6 +6,10 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/syscall.h"
+#include "userprog/pagedir.h"
+#include "threads/palloc.h"
+
+#define MAX_STACK_SIZE 8*(1<<20)
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -129,6 +133,7 @@ page_fault (struct intr_frame *f)
   bool user;         /* True: access by user, false: access by kernel. */
   bool read;
   void *fault_addr;  /* Fault address. */
+  struct thread *t = thread_current();
 
   /* Obtain faulting address, the virtual address that was
      accessed to cause the fault.  It may point to code or to
@@ -151,19 +156,42 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
   read = (f->error_code & PF_W) != 1;
-  if(read || write || !user || is_kernel_vaddr(fault_addr))
+
+  if(fault_addr == NULL || !not_present || !is_user_vaddr(fault_addr))
     {
       syscall_exit(-1);
     }
-
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  kill (f);
+  if(fault_addr >= (f->esp - 32) &&
+  (PHYS_BASE - pg_round_down(fault_addr)) <= MAX_STACK_SIZE)
+  {
+     void *npage = palloc_get_page(PAL_USER | PAL_ZERO);
+     if(npage == NULL)
+     {
+        syscall_exit(-1);
+     }
+     else
+     {
+        if(!pagedir_set_page(t->pagedir, pg_round_down(fault_addr), npage, true))
+        {
+           palloc_free_page(npage);
+        }
+     }
+  }
+  else
+  {
+      if(pagedir_get_page(t->pagedir, fault_addr) == NULL)
+      {
+         syscall_exit(-1);
+      }
+      /* To implement virtual memory, delete the rest of the function
+         body, and replace it with code that brings in the page to
+         which fault_addr refers. */
+      printf ("Page fault at %p: %s error %s page in %s context.\n",
+               fault_addr,
+               not_present ? "not present" : "rights violation",
+               write ? "writing" : "reading",
+               user ? "user" : "kernel");
+      kill (f);
+  }
 }
 
