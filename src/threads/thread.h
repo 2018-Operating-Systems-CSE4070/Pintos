@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include <hash.h>
 #include "threads/synch.h"
 
 #ifndef USERPROG
@@ -140,7 +141,8 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
-
+    struct hash spt;
+    
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

@@ -8,6 +8,7 @@
 #include "userprog/syscall.h"
 #include "userprog/pagedir.h"
 #include "threads/palloc.h"
+#include "vm/page.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -159,8 +160,14 @@ page_fault (struct intr_frame *f)
     {
       syscall_exit(-1);
     }
-  if(fault_addr >= (f->esp - 32) &&
-  (PHYS_BASE - pg_round_down(fault_addr)) <= MAX_STACK_SIZE)
+
+  struct spt_hash_entry *spte = spt_get_entry(&t->spt, pg_round_down(fault_addr));
+  
+  if(spte != NULL)
+  {
+     load_page(spte);
+  }
+  else if(fault_addr >= (f->esp - 32) && (PHYS_BASE - pg_round_down(fault_addr)) <= MAX_STACK_SIZE)
   {
      void *npage = palloc_get_page(PAL_USER | PAL_ZERO);
      if(npage == NULL)
