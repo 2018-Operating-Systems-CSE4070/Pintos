@@ -270,7 +270,7 @@ syscall_read (int fd, void *buffer, unsigned size)
     if(pagedir_get_page(thread_current()->pagedir, buffer_iter) == NULL)
     {
       if(buffer_iter >= (esp - 32) &&
-        (PHYS_BASE - pg_round_down(buffer)) <= 8*(1<<20))
+        (PHYS_BASE - pg_round_down(buffer)) <= MAX_STACK_SIZE)
       {
         void *npage = palloc_get_page(PAL_USER | PAL_ZERO);
         if(npage == NULL)

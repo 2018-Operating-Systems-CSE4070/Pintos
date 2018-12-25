@@ -9,8 +9,6 @@
 #include "userprog/pagedir.h"
 #include "threads/palloc.h"
 
-#define MAX_STACK_SIZE 8*(1<<20)
-
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 

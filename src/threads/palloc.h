@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 
+#define MAX_STACK_SIZE 8*(1<<20)
+
 /* How to allocate pages. */
 enum palloc_flags
   {
