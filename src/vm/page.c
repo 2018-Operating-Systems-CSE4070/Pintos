@@ -50,7 +50,6 @@ bool spt_insert_file(struct hash *h, struct file *f, off_t offset, void* uaddr, 
     spte->write = write;
     spte->load = false;
     
-    printf("\n\n%d\n\n", (int)uaddr);
     if(hash_insert(h, &spte->elem) != NULL) return false;
     else return true;
 }
@@ -60,8 +59,6 @@ struct spt_hash_entry* spt_get_entry(struct hash *h, void* uaddr)
     struct hash_elem *e;
     spte.uaddr = uaddr;
     e = hash_find(h, &spte.elem);
-
-    printf("\n\nfind %d\n\n", (int)uaddr);
 
     if(e != NULL) return hash_entry(e, struct spt_hash_entry, elem);
     else return NULL;
